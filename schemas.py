@@ -1,48 +1,56 @@
 """
-Database Schemas
+Database Schemas for Intelligent Calendar
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
-
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Each Pydantic model maps to a MongoDB collection with the lowercase
+class name as the collection name.
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Literal, List
 
-# Example schemas (replace with your own):
+# Categories supported by the planner
+Category = Literal[
+    "Arbeit",
+    "Fitness",
+    "Haushalt",
+    "Social",
+    "Lernen",
+    "Persönlich",
+]
 
-class User(BaseModel):
+Status = Literal["geplant", "aktiv", "erledigt", "abgesagt"]
+
+class Task(BaseModel):
     """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
+    Aufgaben-Schema
+    Collection: "task"
     """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+    title: str = Field(..., description="Aufgabentitel")
+    note: Optional[str] = Field(None, description="Originale Notiz/NLP Eingabe")
+    category: Optional[Category] = Field(None, description="Kategorie der Aufgabe")
+    duration_minutes: int = Field(..., gt=0, le=24*60, description="Geschätzte Dauer in Minuten")
+    priority: Optional[int] = Field(None, ge=1, le=5, description="1 (hoch) bis 5 (niedrig)")
+    status: Status = Field("geplant")
+    fixed: bool = Field(False, description="Feststehender Block (nicht verschiebbar)")
+    date: Optional[str] = Field(None, description="YYYY-MM-DD für geplantes Datum")
+    start_time: Optional[str] = Field(None, description="Startzeit HH:MM falls fest")
+    end_time: Optional[str] = Field(None, description="Endzeit HH:MM falls fest")
 
-class Product(BaseModel):
+class Block(BaseModel):
     """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
+    Kalenderblock-Schema
+    Collection: "block"
     """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+    title: str
+    category: Optional[Category] = None
+    start_iso: str = Field(..., description="ISO-Startzeit")
+    end_iso: str = Field(..., description="ISO-Endzeit")
+    duration_minutes: int = Field(..., gt=0)
+    status: Status = Field("geplant")
+    fixed: bool = Field(False)
+    task_id: Optional[str] = Field(None, description="Verknüpfte Task-ID")
 
-# Add your own schemas here:
-# --------------------------------------------------
-
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class PlanPreview(BaseModel):
+    steps: List[Task]
+    suggested_blocks: List[Block]
+    conflicts: List[str] = []
